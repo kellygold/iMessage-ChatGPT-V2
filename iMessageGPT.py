@@ -6,13 +6,16 @@ import time
 import json
 import os
 bot = ChatGPT()
-
+mode=""
 
 def init():
+    # ask the user which mode to use, auto or manual
+    mode = input("Would you like to use auto or manual mode? (auto/manual, default auto): ")
+    mode = "auto"
     #ask the user for the path of their iMessage database
     path = input("What is the path to your iMessage database? (/Users/userName/Messages/chatDB): ")
     path = "/Users/kellygold/Library/Messages/chat.db"
-    return path
+    return[path, mode]
 
 def select_conversation(recent_messages):
     #Show the unique phone numbers of the people you have recently texted and ask the user to choose one using numbers
@@ -68,17 +71,17 @@ def ask_chatGPT(prompt):
     # print(response)
     return response
 
-def get_recent_messages(chat_db):
+def get_recent_messages(chat_db, mode):
     # Phone number or label for "you"
     self_number = "Me"
     # Number of messages to return
     n = 400
     # Read the messages
-    messages = read_messages(chat_db, n=n, self_number=self_number, human_readable_date=True)
+    messages = read_messages(chat_db, n,mode, self_number=self_number, human_readable_date=True)
     return messages
 
 
-def read_messages(db_location, n=10, self_number='Me', human_readable_date=True):
+def read_messages(db_location, n, mode, self_number='Me', human_readable_date=True):
     conn = sqlite3.connect(db_location)
     cursor = conn.cursor()
 
@@ -124,14 +127,14 @@ def read_messages(db_location, n=10, self_number='Me', human_readable_date=True)
             unix_timestamp = int(mod_date.timestamp())*1000000000
             new_date = int((date+unix_timestamp)/1000000000)
             date = datetime.datetime.fromtimestamp(new_date).strftime("%Y-%m-%d %H:%M:%S")
-
+            
         messages.append(
             {"rowid": rowid, "date": date, "body": body, "phone_number": phone_number, "is_from_me": is_from_me,
              "cache_roomname": cache_roomname})
-
     conn.close()
     return messages
-def askAndRespond(conversation_messages, person):
+
+def askAndRespond(conversation_messages, person, mode):
     # Give chatGPT instructions and ask if it understands
     firstAsk = "Draft a response to a text message conversation between Kelly and "+person+". I will give you a JSON Array of the most recent message data. For each item in the array: the field 'date' is when the message was sent, the field 'body' is the message text. When the field 'is_from_me' equals 0, the message was sent by " + person + ". When the field 'is_from_me' equals 1 the message was sent from Kelly. Draft a response to the most recent message(s) from " + person + " as Kelly. Limit the draft to 280 characters, do not use Kelly or " + person + "'s name, only respond with the drafted text message and NO OTHER TEXT. Do not use quotes. Use informal language and match the style of other messages if possible. Make your response brief like a text message. I will first show you the message data, after you process them draft and output ONLY the drafted response. Do you understand? "
     #print(firstAsk)
@@ -140,6 +143,9 @@ def askAndRespond(conversation_messages, person):
     # Give chatGPT the conversation messages
     secondResponse = ask_chatGPT(json.dumps(conversation_messages[0:5]))
     rawSecondResponse = secondResponse.replace('"', '')
+    if mode=="auto":
+        print("Response accepted.")
+        return rawSecondResponse
     print(rawSecondResponse)
     print('\n')
     checkWithUser = input("Is this the response you want to send? (y/n): ")
@@ -162,7 +168,6 @@ def askAndRespond(conversation_messages, person):
         exit()
     return rawSecondResponse
         
-
 def sender(phone_number, response):
     file_path = os.path.abspath('imessage_tmp.txt')
     with open(file_path, 'w') as f:
@@ -170,12 +175,14 @@ def sender(phone_number, response):
         command = f'tell application "Messages" to send (read (POSIX file "{file_path}") as «class utf8») to buddy "{phone_number}"'
     subprocess.run(['osascript', '-e', command])
     print("Message sent! \n")
-# main logic control
-chat_db = init()
-initialMessages = get_recent_messages(chat_db)
+
+
+### CORE LOGIC ###
+config = init()
+initialMessages = get_recent_messages(config[0], config[1])
 conversation_phone_number = select_conversation(initialMessages)
 while True:
-    recent_messages = get_recent_messages(chat_db)
+    recent_messages = get_recent_messages(config[0], config[1])
     conversation_messages = filter_messages(recent_messages, conversation_phone_number[0], conversation_phone_number[1])
     if check_last_sender(conversation_messages) == " Kelly: ":
         print("You were the last sender... Waiting for a response...")
@@ -185,7 +192,7 @@ while True:
     else:
         print("You were not the last sender... Sending a message...")
         print('\n')
-        replyMessage = askAndRespond(conversation_messages, conversation_phone_number[1])
+        replyMessage = askAndRespond(conversation_messages, conversation_phone_number[1], config[1])
         sender(conversation_phone_number[0], replyMessage)
         time.sleep(5)
         os.system('clear')
