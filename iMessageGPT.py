@@ -144,15 +144,22 @@ def askAndRespond(conversation_messages, person):
     print('\n')
     checkWithUser = input("Is this the response you want to send? (y/n): ")
     print('\n')
-    subtractor = 0
-    while checkWithUser == "n" and subtractor  < 5:
-        subtractor = subtractor + 1
+    subtractor = 1
+    while checkWithUser != "y" and subtractor  < 5:
         print("Generating a new response...")
         print('\n')
-        altResponse = ask_chatGPT(json.dumps(conversation_messages[0:5]))
+        #altResponse = ask_chatGPT(json.dumps(conversation_messages[0:(5-subtractor)]))
+        altResponse = ask_chatGPT("generate a different response, shorten the response and only output response text")
+        rawSecondResponse = altResponse.replace('"', '')
         print(rawSecondResponse)
         print('\n')
         checkWithUser = input("Is this the response you want to send? (y/n): ")
+        subtractor = subtractor + 1
+    if checkWithUser=="y":
+        print("Response accepted.")
+    else:
+        print("No good responses were generated. Please run the program again.")
+        exit()
     return rawSecondResponse
         
 
@@ -162,18 +169,23 @@ def sender(phone_number, response):
         f.write(response)
         command = f'tell application "Messages" to send (read (POSIX file "{file_path}") as «class utf8») to buddy "{phone_number}"'
     subprocess.run(['osascript', '-e', command])
-
+    print("Message sent! \n")
 # main logic control
 chat_db = init()
-recent_messages = get_recent_messages(chat_db)
-conversation_phone_number = select_conversation(recent_messages)
-conversation_messages = filter_messages(recent_messages, conversation_phone_number[0], conversation_phone_number[1])
-if check_last_sender(conversation_messages) == " Kelly: ":
-    print("You were the last sender... Waiting for a response...")
-    print('\n')
-    time.sleep(5)
-else:
-    print("You were not the last sender... Sending a message...")
-    print('\n')
-    replyMessage = askAndRespond(conversation_messages, conversation_phone_number[1])
-    sender(conversation_phone_number[0], replyMessage)
+initialMessages = get_recent_messages(chat_db)
+conversation_phone_number = select_conversation(initialMessages)
+while True:
+    recent_messages = get_recent_messages(chat_db)
+    conversation_messages = filter_messages(recent_messages, conversation_phone_number[0], conversation_phone_number[1])
+    if check_last_sender(conversation_messages) == " Kelly: ":
+        print("You were the last sender... Waiting for a response...")
+        print('\n')
+        time.sleep(5)
+        os.system('clear')
+    else:
+        print("You were not the last sender... Sending a message...")
+        print('\n')
+        replyMessage = askAndRespond(conversation_messages, conversation_phone_number[1])
+        sender(conversation_phone_number[0], replyMessage)
+        time.sleep(5)
+        os.system('clear')
