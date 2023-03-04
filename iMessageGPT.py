@@ -9,12 +9,21 @@ bot = ChatGPT()
 mode=""
 
 def init():
+    # clear screen
+    os.system('clear')
+
     # ask the user which mode to use, auto or manual
-    mode = input("Would you like to use auto or manual mode? (auto/manual, default auto): ")
-    mode = "auto"
+    mode = "manual"
+    mode = input("Auto or Manual mode? Default Manual (auto/manual): ")
+
+    #ask if they have a contacts.json file
+    contacts = "no"
+    contacts = input("have a cleanContacts.json file? Enter the file path here, otherwise hit enter to continue): ")
+
     #ask the user for the path of their iMessage database
     path = input("What is the path to your iMessage database? (/Users/userName/Messages/chatDB): ")
     path = "/Users/kellygold/Library/Messages/chat.db"
+    
     return[path, mode]
 
 def select_conversation(recent_messages):
@@ -25,7 +34,7 @@ def select_conversation(recent_messages):
     all = []
     for i, phone_number in enumerate(unique_phone_numbers):
         #open contacts.json and check if phone_number = ZFULLNUMBER, if so, print ZFIRSTNAME and phone_number
-        with open('fullContactsClean.json') as f:
+        with open('cleanContacts.json') as f:
             data = json.load(f)
             for p in data:
                 if count >=10:
@@ -154,7 +163,6 @@ def askAndRespond(conversation_messages, person, mode):
     while checkWithUser != "y" and subtractor  < 5:
         print("Generating a new response...")
         print('\n')
-        #altResponse = ask_chatGPT(json.dumps(conversation_messages[0:(5-subtractor)]))
         altResponse = ask_chatGPT("generate a different response, shorten the response and only output response text")
         rawSecondResponse = altResponse.replace('"', '')
         print(rawSecondResponse)
@@ -187,12 +195,12 @@ while True:
     if check_last_sender(conversation_messages) == " Kelly: ":
         print("You were the last sender... Waiting for a response...")
         print('\n')
-        time.sleep(5)
+        time.sleep(60)
         os.system('clear')
     else:
         print("You were not the last sender... Sending a message...")
         print('\n')
         replyMessage = askAndRespond(conversation_messages, conversation_phone_number[1], config[1])
         sender(conversation_phone_number[0], replyMessage)
-        time.sleep(5)
+        time.sleep(60)
         os.system('clear')
